@@ -12,7 +12,7 @@ torch.manual_seed(matricola)
 random.seed(matricola)
 np.random.seed(matricola)
 
-
+### The class for the AUTOENCODER contains architecture, training, testing and ploting functions
 class Autoencoder(nn.Module):
     def __init__(self, encoded_space_dim):
         super().__init__()
