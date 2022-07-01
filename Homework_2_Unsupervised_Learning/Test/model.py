@@ -345,3 +345,226 @@ class Fine_Tuned_Autoencoder(nn.Module):
         
         
         
+        
+### The class for the AUTOENCODER contains architecture, training, testing and ploting functions
+class Variational_Autoencoder(nn.Module):
+    def __init__(self, encoded_space_dim):
+        super().__init__()
+        
+        ### Encoder
+        self.encoder = nn.Sequential(  
+            nn.Conv2d(in_channels = 1,    # First convolutional layer
+                      out_channels = 8,
+                      kernel_size=3, 
+                      stride=2,
+                      padding=1),
+            nn.ReLU(True),
+            nn.Conv2d(in_channels=8,      # Second convolutional layer
+                      out_channels=16,
+                      kernel_size=3, 
+                      stride=2,
+                      padding=1),
+            nn.ReLU(True),
+            nn.Conv2d(in_channels=16,     # Third convolutional layer
+                      out_channels=32,
+                      kernel_size=3, 
+                      stride=2,
+                      padding=0),
+            nn.ReLU(True),
+            nn.Flatten(start_dim=1)            # Flatten layer
+                                  )
+        
+        ### Now we implement the variational part
+        self.fc_mn = nn.Sequential(nn.Linear(in_features= (32 * 3* 3),out_features=64),                             
+                                   nn.ReLU(True),          
+                                   nn.Linear(in_features=64, out_features=encoded_space_dim)
+                                  )
+        
+        self.fc_std = nn.Sequential(nn.Linear(in_features= (32 * 3* 3),out_features=64),                             
+                                   nn.ReLU(True),          
+                                   nn.Linear(in_features=64, out_features=encoded_space_dim)
+                                  )
+        
+
+        ### Decoder
+        self.decoder = nn.Sequential(
+            nn.Linear(in_features=encoded_space_dim, out_features=64), # First linear layer
+            nn.ReLU(True),
+            nn.Linear(in_features=64, out_features=(32*3*3)),          # Second linear layer
+            nn.ReLU(True),
+            nn.Unflatten(dim=1, unflattened_size=(32, 3, 3)),           #Unflaten
+            nn.ConvTranspose2d(in_channels=32,                         # First transposed convolution
+                               out_channels=16,
+                               kernel_size=3, 
+                               stride=2,
+                               padding =0,
+                               output_padding=0),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(in_channels=16,                         # Second transposed convolution
+                               out_channels=8,
+                               kernel_size=3, 
+                               stride=2,
+                               padding=1,
+                               output_padding=1),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(in_channels=8,                          # Third transposed convolution
+                               out_channels=1,
+                               kernel_size=3, 
+                               stride=2,
+                               padding=1,
+                               output_padding=1)
+                                )
+        
+    def forward(self, x):
+        # Encode
+        z = self.encoder(x) 
+        # Predict distribution mean and standard deviation
+        mn  = self.fc_mn(z)
+        std = self.fc_std(z)
+        #sample distribution based on mean and standard deviation
+        sample = mn + torch.exp(std/2)*torch.rand_like(mn)
+        #decode
+        #out = self.decoder(sample)
+        return out, mn, std
+    
+    def loss_VAE(self,prediction, real,mu,sigma):
+        loss = F.mse_loss(prediction, real, reduction='sum') 
+        kl_div    = -0.5 * torch.sum(1. + sigma - mu**2 - torch.exp(sigma))
+        return loss, kl_div
+    
+    def sampler(self,mu,sigma):
+        return mu + torch.exp(sigma/2)*torch.rand_like(mu)
+        
+    
+    ### Training function
+    def train_epoch(self,encoder, decoder,fc_mn,fc_std, device,dataloader, optimizer):
+        """
+        This function train the network for one epoch
+        """
+        # Set train mode for both networks
+        encoder.train()
+        decoder.train()
+        fc_mn.train()
+        fc_std.train()
+        
+        # Train
+        train_loss = []
+        for sample_batched, _ in dataloader:
+            # Move data to device
+            sample_batched = sample_batched.to(device)
+            # Encode the data
+            encoded_sample = encoder(sample_batched)
+            
+            # Predict distribution mean and standard deviation
+            mn  = fc_mn(encoded_sample)
+            std = fc_std(encoded_sample)
+        
+            #sample distribution based on mean and standard deviation
+            sample = self.sampler(mn,std)
+            
+            # Decode the data
+            decoded_sample = decoder(sample)
+            
+            # Compute loss
+            loss, kl_div = self.loss_VAE(decoded_sample, sample_batched,mn,std)
+
+            
+            # Backpropagation
+            optimizer.zero_grad()
+            loss.backward()
+            #Updata weights
+            optimizer.step()
+            #Save trai loss for this batch
+            loss_batch = loss.detach().cpu().numpy()
+            train_loss.append(loss_batch)
+        #Save the average train loss
+        train_loss = np.mean(train_loss)
+        print(f"AVERAGE TRAIN LOSS: {train_loss}")
+
+        return train_loss
+
+    ### Testing function
+    def test_epoch(self,encoder, decoder,fc_mn,fc_std, device, dataloader):
+        """
+        This function test the network performance for one epoch of training
+        """
+        # Set evaluation mode for both networks
+        encoder.eval()
+        decoder.eval()
+        fc_mn.train()
+        fc_std.train()
+        #
+        test_loss = []
+        # Discable gradient tracking
+        with torch.no_grad():
+            for sample_batched, _ in dataloader:
+                # Move data to device
+                sample_batched = sample_batched.to(device)
+                # Encode the data
+                encoded_sample = encoder(sample_batched)
+
+                # Predict distribution mean and standard deviation
+                mn  = fc_mn(encoded_sample)
+                std = fc_std(encoded_sample)
+
+                #sample distribution based on mean and standard deviation
+                sample = self.sampler(mn,std)
+
+                # Decode the data
+                decoded_sample = decoder(sample)
+
+                # Compute loss
+                loss, kl_div = self.loss_VAE(decoded_sample, sample_batched,mn,std)
+                #Save test loss for this batch
+                loss_batch = loss.detach().cpu().numpy()
+                test_loss.append(loss_batch)
+            #Save the average train loss
+            test_loss = np.mean(test_loss)
+            print(f"AVERAGE TEST LOSS: {test_loss}")
+
+        return test_loss
+    
+    
+    
+    def training_cycle(self,encoder,decoder,fc_mn,fc_std,device,training_data, test_data, optim,num_epochs,test_dataset,plot = False):
+        """
+        This function train the network for a desired number of epochs it also test the network 
+        reconstruction performance and make plots comparing the input image and the reconstructed one every 5 epochs.
+        """
+        #I keep track of losses for plots
+        train_loss = []
+        test_loss  = []
+        i = 0
+        for epoch in range(num_epochs):
+            print('EPOCH %d/%d' % (epoch + 1, num_epochs))
+            ### Training (use the training function)
+            tr_l = self.train_epoch(
+                encoder=encoder, 
+                decoder=decoder,
+                fc_mn= fc_mn,
+                fc_std=fc_std,
+                device=device, 
+                dataloader=training_data, 
+                optimizer=optim)
+            train_loss.append(tr_l)
+            ### Validation  (use the testing function)
+            t_l = self.test_epoch(
+                encoder=encoder, 
+                decoder=decoder,
+                fc_mn= fc_mn,
+                fc_std=fc_std,
+                device=device, 
+                dataloader=test_data)
+            test_loss.append(t_l)
+            # Print Validationloss
+            #print('\n\n\t VALIDATION - EPOCH %d/%d - loss: %f\n\n' % (epoch + 1, num_epochs, t_l))
+
+            ### Plot progress
+            #if plot:
+            #    if (i % 5 == 0): self.plot_progress(encoder, decoder,test_dataset,epoch,device,keep = False)
+            #Save network parameters
+            i +=1 
+            torch.save(encoder.state_dict(), 'encoder_params.pth')
+            torch.save(decoder.state_dict(), 'decoder_params.pth')
+        return train_loss, test_loss
+        
