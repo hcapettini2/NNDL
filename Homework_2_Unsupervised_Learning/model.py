@@ -175,8 +175,9 @@ class Autoencoder(nn.Module):
             i +=1 
             ### Save network parameters
             if keep_model:
-                torch.save(encoder.state_dict(), 'encoder_params.pth')
-                torch.save(decoder.state_dict(), 'decoder_params.pth')
+                os.makedirs('./Models', exist_ok=True)
+                torch.save(self.encoder.state_dict(), './Models/encoder_params.pth')
+                torch.save(self.decoder.state_dict(), './Models/decoder_params.pth')
         return train_loss, test_loss
     
     
