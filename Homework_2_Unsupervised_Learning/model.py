@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import random
+import os
 
 # Set seeds for reproducibility (PyTorch, Python, Numpy)
 matricola = 2013031
@@ -74,33 +75,34 @@ class Autoencoder(nn.Module):
                                output_padding=1)
         )
         
-    def forward(self, x):
-        # Apply linear layers
+    def forward(self, x,mode):
+        if (mode == "Train"):
+            self.encoder.train()
+            self.decoder.train()
+        elif (mode == "Test"):
+            self.encoder.eval()
+            self.decoder.eval()
+            
+        # Apply encoder decoder
         x = self.encoder(x)
         x = self.decoder(x)
         return x
-    
+
     
     ### Training function
-    def train_epoch(self,encoder, decoder, device,dataloader, loss_fn, optimizer):
+    def train_epoch(self,device,dataloader, loss_fn, optimizer):
         """
         This function train the network for one epoch
         """
-        # Set train mode for both networks
-        encoder.train()
-        decoder.train()
-
         # Train
         train_loss = []
         for sample_batched, _ in dataloader:
             # Move data to device
             sample_batched = sample_batched.to(device)
-            # Encode the data
-            encoded_sample = encoder(sample_batched)
-            # Decode the data
-            decoded_sample = decoder(encoded_sample)
+            # Encode Decode the data
+            encoded_decoded_sample = self.forward(sample_batched,"Train")
             # Compute loss
-            loss = loss_fn(decoded_sample, sample_batched)
+            loss = loss_fn(encoded_decoded_sample, sample_batched)
             # Backpropagation
             optimizer.zero_grad()
             loss.backward()
@@ -116,26 +118,20 @@ class Autoencoder(nn.Module):
         return train_loss
 
     ### Testing function
-    def test_epoch(self,encoder, decoder, device, dataloader, loss_fn):
+    def test_epoch(self,device, dataloader, loss_fn):
         """
         This function test the network performance for one epoch of training
         """
-        # Set evaluation mode for both networks
-        encoder.eval()
-        decoder.eval()
-        #
         test_loss = []
         # Discable gradient tracking
         with torch.no_grad():
             for sample_batched, _ in dataloader:
                 # Move data to device
                 sample_batched = sample_batched.to(device)
-                # Encode the data
-                encoded_sample = encoder(sample_batched)
-                # Decode the data
-                decoded_sample = decoder(encoded_sample)
+                # Encode Decode the data
+                encoded_decoded_sample = self.forward(sample_batched,"Test")
                 # Compute loss
-                loss = loss_fn(decoded_sample, sample_batched)
+                loss = loss_fn(encoded_decoded_sample, sample_batched)
                  #Save test loss for this batch
                 loss_batch = loss.detach().cpu().numpy()
                 test_loss.append(loss_batch)
@@ -145,45 +141,10 @@ class Autoencoder(nn.Module):
 
         return test_loss
     
-    
-    def plot_progress(self,encoder, decoder,test_dataset,epoch,device,keep =False):
-        """
-        This function plot the image we send to the autoencoder and the one returned by the
-        network.
-        """
-        categories = ['T-shirt/top','Trouser','Pullover','Dress','Coat','Sandal','Shirt','Sneaker','Bag','Ankle boot']
-        elements = [0,1,5,37]
-
-        encoder.eval()
-        decoder.eval()
-        fig, axs = plt.subplots(2, 4, figsize=(12,6))
-        fig.suptitle('Original images and reconstructed image (EPOCH %d)' % (epoch + 1),fontsize=15)
-        fig.subplots_adjust(top=0.88)
-        axs = axs.ravel()
-        for i in range (4):
-            img, label = test_dataset[elements[i]][0].unsqueeze(0).to(device),test_dataset[elements[i]][1]
-            with torch.no_grad():
-                rec_img  = decoder(encoder(img))
-            # Plot the reconstructed image  
-            axs[i].imshow(img.cpu().squeeze().numpy(), cmap='gist_gray')
-            axs[i].set_title(categories[label])
-            axs[i].set_xticks([])
-            axs[i].set_yticks([])
-            axs[i+4].imshow(rec_img.cpu().squeeze().numpy(), cmap='gist_gray')
-            axs[i+4].set_title('Reconstructed image')
-            axs[i+4].set_xticks([])
-            axs[i+4].set_yticks([])
-        plt.tight_layout()
-        fig.subplots_adjust(top=0.88)
-        # Save figures
-        if keep:
-            os.makedirs('autoencoder_progress_%d_features' % encoded_space_dim, exist_ok=True)
-            fig.savefig('autoencoder_progress_%d_features/epoch_%d.jpg' % (encoded_space_dim, epoch + 1))
-        plt.show()
-        plt.close()
         
         
-    def training_cycle(self,encoder,decoder,device,training_data, test_data, loss_fn, optim,num_epochs,test_dataset,plot = False):
+    def training_cycle(self, device, training_data, test_data, loss_fn, optim, num_epochs, test_dataset,encoded_space_dim, plot = False,
+                       keep_plots = False, keep_model=False):
         """
         This function train the network for a desired number of epochs it also test the network 
         reconstruction performance and make plots comparing the input image and the reconstructed one every 5 epochs.
@@ -196,8 +157,6 @@ class Autoencoder(nn.Module):
             print('EPOCH %d/%d' % (epoch + 1, num_epochs))
             ### Training (use the training function)
             tr_l = self.train_epoch(
-                encoder=encoder, 
-                decoder=decoder, 
                 device=device, 
                 dataloader=training_data, 
                 loss_fn=loss_fn, 
@@ -205,23 +164,198 @@ class Autoencoder(nn.Module):
             train_loss.append(tr_l)
             ### Validation  (use the testing function)
             t_l = self.test_epoch(
-                encoder=encoder, 
-                decoder=decoder, 
                 device=device, 
                 dataloader=test_data, 
                 loss_fn=loss_fn)
             test_loss.append(t_l)
-            # Print Validationloss
-            #print('\n\n\t VALIDATION - EPOCH %d/%d - loss: %f\n\n' % (epoch + 1, num_epochs, t_l))
 
             ### Plot progress
             if plot:
-                if (i % 5 == 0): self.plot_progress(encoder, decoder,test_dataset,epoch,device,keep = False)
-            #Save network parameters
+                if (i % 5 == 0): self.plot_progress(test_dataset,epoch,device,encoded_space_dim,keep_plots = keep_plots)
             i +=1 
-            torch.save(encoder.state_dict(), 'encoder_params.pth')
-            torch.save(decoder.state_dict(), 'decoder_params.pth')
+            ### Save network parameters
+            if keep_model:
+                torch.save(encoder.state_dict(), 'encoder_params.pth')
+                torch.save(decoder.state_dict(), 'decoder_params.pth')
         return train_loss, test_loss
+    
+    
+    
+    def plot_progress(self,test_dataset,epoch,device,encoded_space_dim,keep_plots = False):
+        """
+        This function plot the image we send to the autoencoder and the one returned by the
+        network.
+        """
+        categories = ['T-shirt/top','Trouser','Pullover','Dress','Coat','Sandal','Shirt','Sneaker','Bag','Ankle boot']
+        elements = [0,1,5,37]
+
+        fig, axs = plt.subplots(2, 4, figsize=(12,6))
+        fig.suptitle('Original images and reconstructed image (EPOCH %d)' % (epoch + 1),fontsize=15)
+        fig.subplots_adjust(top=0.88)
+        axs = axs.ravel()
+        for i in range (4):
+            img, label = test_dataset[elements[i]][0].unsqueeze(0).to(device),test_dataset[elements[i]][1]
+            with torch.no_grad():
+                rec_img  = self.forward(img,"Test")
+            # Plot the reconstructed image  
+            axs[i].imshow(img.cpu().squeeze().numpy(), cmap='gist_gray')
+            axs[i].set_title(categories[label])
+            axs[i].set_xticks([])
+            axs[i].set_yticks([])
+            axs[i+4].imshow(rec_img.cpu().squeeze().numpy(), cmap='gist_gray')
+            axs[i+4].set_title('Reconstructed image')
+            axs[i+4].set_xticks([])
+            axs[i+4].set_yticks([])
+        plt.tight_layout()
+        fig.subplots_adjust(top=0.88)
+        # Save figures
+        if keep_plots:
+            os.makedirs('./Img/Training_plots/autoencoder_progress_%d_features' % encoded_space_dim, exist_ok=True)
+            fig.savefig('./Img/Training_plots/autoencoder_progress_%d_features/epoch_%d.svg' % (encoded_space_dim, epoch + 1), format='svg')
+        plt.show()
+        plt.close()
+    
+#     ### Training function
+#     def train_epoch(self,encoder, decoder, device,dataloader, loss_fn, optimizer):
+#         """
+#         This function train the network for one epoch
+#         """
+#         # Set train mode for both networks
+#         encoder.train()
+#         decoder.train()
+
+#         # Train
+#         train_loss = []
+#         for sample_batched, _ in dataloader:
+#             # Move data to device
+#             sample_batched = sample_batched.to(device)
+#             # Encode the data
+#             encoded_sample = encoder(sample_batched)
+#             # Decode the data
+#             decoded_sample = decoder(encoded_sample)
+#             # Compute loss
+#             loss = loss_fn(decoded_sample, sample_batched)
+#             # Backpropagation
+#             optimizer.zero_grad()
+#             loss.backward()
+#             #Updata weights
+#             optimizer.step()
+#             #Save trai loss for this batch
+#             loss_batch = loss.detach().cpu().numpy()
+#             train_loss.append(loss_batch)
+#         #Save the average train loss
+#         train_loss = np.mean(train_loss)
+#         print(f"AVERAGE TRAIN LOSS: {train_loss}")
+
+#         return train_loss
+
+#     ### Testing function
+#     def test_epoch(self,encoder, decoder, device, dataloader, loss_fn):
+#         """
+#         This function test the network performance for one epoch of training
+#         """
+#         # Set evaluation mode for both networks
+#         encoder.eval()
+#         decoder.eval()
+#         #
+#         test_loss = []
+#         # Discable gradient tracking
+#         with torch.no_grad():
+#             for sample_batched, _ in dataloader:
+#                 # Move data to device
+#                 sample_batched = sample_batched.to(device)
+#                 # Encode the data
+#                 encoded_sample = encoder(sample_batched)
+#                 # Decode the data
+#                 decoded_sample = decoder(encoded_sample)
+#                 # Compute loss
+#                 loss = loss_fn(decoded_sample, sample_batched)
+#                  #Save test loss for this batch
+#                 loss_batch = loss.detach().cpu().numpy()
+#                 test_loss.append(loss_batch)
+#             #Save the average train loss
+#             test_loss = np.mean(test_loss)
+#             print(f"AVERAGE TEST LOSS: {test_loss}")
+
+#         return test_loss
+    
+    
+#     def plot_progress(self,encoder, decoder,test_dataset,epoch,device,keep =False):
+#         """
+#         This function plot the image we send to the autoencoder and the one returned by the
+#         network.
+#         """
+#         categories = ['T-shirt/top','Trouser','Pullover','Dress','Coat','Sandal','Shirt','Sneaker','Bag','Ankle boot']
+#         elements = [0,1,5,37]
+
+#         encoder.eval()
+#         decoder.eval()
+#         fig, axs = plt.subplots(2, 4, figsize=(12,6))
+#         fig.suptitle('Original images and reconstructed image (EPOCH %d)' % (epoch + 1),fontsize=15)
+#         fig.subplots_adjust(top=0.88)
+#         axs = axs.ravel()
+#         for i in range (4):
+#             img, label = test_dataset[elements[i]][0].unsqueeze(0).to(device),test_dataset[elements[i]][1]
+#             with torch.no_grad():
+#                 rec_img  = decoder(encoder(img))
+#             # Plot the reconstructed image  
+#             axs[i].imshow(img.cpu().squeeze().numpy(), cmap='gist_gray')
+#             axs[i].set_title(categories[label])
+#             axs[i].set_xticks([])
+#             axs[i].set_yticks([])
+#             axs[i+4].imshow(rec_img.cpu().squeeze().numpy(), cmap='gist_gray')
+#             axs[i+4].set_title('Reconstructed image')
+#             axs[i+4].set_xticks([])
+#             axs[i+4].set_yticks([])
+#         plt.tight_layout()
+#         fig.subplots_adjust(top=0.88)
+#         # Save figures
+#         if keep:
+#             os.makedirs('autoencoder_progress_%d_features' % encoded_space_dim, exist_ok=True)
+#             fig.savefig('autoencoder_progress_%d_features/epoch_%d.jpg' % (encoded_space_dim, epoch + 1))
+#         plt.show()
+#         plt.close()
+        
+        
+#     def training_cycle(self,encoder,decoder,device,training_data, test_data, loss_fn, optim,num_epochs,test_dataset,plot = False):
+#         """
+#         This function train the network for a desired number of epochs it also test the network 
+#         reconstruction performance and make plots comparing the input image and the reconstructed one every 5 epochs.
+#         """
+#         #I keep track of losses for plots
+#         train_loss = []
+#         test_loss  = []
+#         i = 0
+#         for epoch in range(num_epochs):
+#             print('EPOCH %d/%d' % (epoch + 1, num_epochs))
+#             ### Training (use the training function)
+#             tr_l = self.train_epoch(
+#                 encoder=encoder, 
+#                 decoder=decoder, 
+#                 device=device, 
+#                 dataloader=training_data, 
+#                 loss_fn=loss_fn, 
+#                 optimizer=optim)
+#             train_loss.append(tr_l)
+#             ### Validation  (use the testing function)
+#             t_l = self.test_epoch(
+#                 encoder=encoder, 
+#                 decoder=decoder, 
+#                 device=device, 
+#                 dataloader=test_data, 
+#                 loss_fn=loss_fn)
+#             test_loss.append(t_l)
+#             # Print Validationloss
+#             #print('\n\n\t VALIDATION - EPOCH %d/%d - loss: %f\n\n' % (epoch + 1, num_epochs, t_l))
+
+#             ### Plot progress
+#             if plot:
+#                 if (i % 5 == 0): self.plot_progress(encoder, decoder,test_dataset,epoch,device,keep = False)
+#             #Save network parameters
+#             i +=1 
+#             torch.save(encoder.state_dict(), 'encoder_params.pth')
+#             torch.save(decoder.state_dict(), 'decoder_params.pth')
+#         return train_loss, test_loss
     
     
     
