@@ -91,7 +91,7 @@ class Autoencoder(nn.Module):
 
     
     ### Training function
-    def train_epoch(self,device,dataloader, loss_fn, optimizer, verbose= True):
+    def train_epoch(self,device,dataloader, loss_fn, optimizer, verbose = True):
         """
         This function train the network for one epoch
         """
@@ -161,13 +161,15 @@ class Autoencoder(nn.Module):
                 device=device, 
                 dataloader=training_data, 
                 loss_fn=loss_fn, 
-                optimizer=optim)
+                optimizer=optim,
+                verbose = verbose)
             train_loss.append(tr_l)
             ### Validation  (use the testing function)
             t_l = self.test_epoch(
                 device=device, 
                 dataloader=test_data, 
-                loss_fn=loss_fn)
+                loss_fn=loss_fn,
+                verbose = verbose)
             test_loss.append(t_l)
 
             ### Plot progress
