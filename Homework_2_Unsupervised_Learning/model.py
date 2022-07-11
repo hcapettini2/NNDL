@@ -16,31 +16,31 @@ np.random.seed(matricola)
 
 ### The class for the AUTOENCODER contains architecture, training, testing and ploting functions
 class Autoencoder(nn.Module):
-    def __init__(self, encoded_space_dim):
+    def __init__(self, encoded_space_dim, nf):
         super().__init__()
         
         ### Encoder
         self.encoder = nn.Sequential(  
-            nn.Conv2d(in_channels = 1,    # First convolutional layer
-                      out_channels = 8,
-                      kernel_size=3, 
-                      stride=2,
-                      padding=1),
-            nn.ReLU(True),
-            nn.Conv2d(in_channels=8,      # Second convolutional layer
-                      out_channels=16,
-                      kernel_size=3, 
-                      stride=2,
-                      padding=1),
-            nn.ReLU(True),
-            nn.Conv2d(in_channels=16,     # Third convolutional layer
-                      out_channels=32,
-                      kernel_size=3, 
-                      stride=2,
-                      padding=0),
-            nn.ReLU(True),
+            nn.Conv2d(in_channels  = 1,       # First convolutional layer
+                      out_channels = nf,
+                      kernel_size  = 3, 
+                      stride       = 2,
+                      padding      = 1),
+            nn.ReLU(True),                    #OUT  [nf X 14 X 14]
+            nn.Conv2d(in_channels  = nf,      # Second convolutional layer
+                      out_channels = 2 * nf,
+                      kernel_size  = 3, 
+                      stride       = 2,
+                      padding      = 1),
+            nn.ReLU(True),                    #OUT [2nf X 7 X 7]
+            nn.Conv2d(in_channels  = 2 * nf,  # Third convolutional layer
+                      out_channels = 4 * nf,
+                      kernel_size  = 3, 
+                      stride       = 2,
+                      padding      = 0),
+            nn.ReLU(True),                    #OUT [4nf X 3 x 3]
             nn.Flatten(start_dim=1),            # Flatten layer
-            nn.Linear(in_features= (32 * 3* 3),
+            nn.Linear(in_features= ((4 * nf) * 3* 3),
                       out_features=64),                               # First linear layer
             nn.ReLU(True),
             nn.Linear(in_features=64, out_features=encoded_space_dim) # Second linear layer
@@ -51,29 +51,29 @@ class Autoencoder(nn.Module):
         self.decoder = nn.Sequential(
             nn.Linear(in_features=encoded_space_dim, out_features=64), # First linear layer
             nn.ReLU(True),
-            nn.Linear(in_features=64, out_features=(32*3*3)),          # Second linear layer
+            nn.Linear(in_features=64, out_features=((4 * nf)*3*3)),          # Second linear layer
             nn.ReLU(True),
-            nn.Unflatten(dim=1, unflattened_size=(32, 3, 3)),           #Unflaten
-            nn.ConvTranspose2d(in_channels=32,                         # First transposed convolution
-                               out_channels=16,
-                               kernel_size=3, 
-                               stride=2,
-                               padding =0,
-                               output_padding=0),
+            nn.Unflatten(dim=1, unflattened_size=((4 * nf), 3, 3)),           #Unflaten
+            nn.ConvTranspose2d(in_channels    = 4 * nf,                         # First transposed convolution
+                               out_channels   = 2 * nf,
+                               kernel_size    = 3, 
+                               stride         = 2,
+                               padding        = 0,
+                               output_padding = 0),
             nn.ReLU(True),
-            nn.ConvTranspose2d(in_channels=16,                         # Second transposed convolution
-                               out_channels=8,
-                               kernel_size=3, 
-                               stride=2,
-                               padding=1,
-                               output_padding=1),
+            nn.ConvTranspose2d(in_channels    = 2 * nf,                         # Second transposed convolution
+                               out_channels   = nf,
+                               kernel_size    = 3, 
+                               stride         = 2,
+                               padding        = 1,
+                               output_padding = 1),
             nn.ReLU(True),
-            nn.ConvTranspose2d(in_channels=8,                          # Third transposed convolution
-                               out_channels=1,
-                               kernel_size=3, 
-                               stride=2,
-                               padding=1,
-                               output_padding=1)
+            nn.ConvTranspose2d(in_channels    = nf,                          # Third transposed convolution
+                               out_channels   = 1,
+                               kernel_size    = 3, 
+                               stride         = 2,
+                               padding        = 1,
+                               output_padding = 1)
         )
         
     def forward(self, x,mode):
@@ -221,6 +221,8 @@ class Autoencoder(nn.Module):
     
 
     
+    
+    
 class Fine_Tuned_Autoencoder(nn.Module):
     def __init__(self, encoded_space_dim, pre_trained_AE):
         super().__init__()
@@ -327,39 +329,39 @@ class Fine_Tuned_Autoencoder(nn.Module):
         
 ### The class for the AUTOENCODER contains architecture, training, testing and ploting functions
 class Variational_Autoencoder(nn.Module):
-    def __init__(self, encoded_space_dim):
+    def __init__(self, encoded_space_dim,nf):
         super().__init__()
         
         ### Encoder
         self.encoder = nn.Sequential(  
-            nn.Conv2d(in_channels = 1,    # First convolutional layer
-                      out_channels = 8,
-                      kernel_size=3, 
-                      stride=2,
-                      padding=1),
+            nn.Conv2d(in_channels  = 1,    # First convolutional layer
+                      out_channels = nf,
+                      kernel_size  = 3, 
+                      stride       = 2,
+                      padding      = 1),
             nn.ReLU(True),
-            nn.Conv2d(in_channels=8,      # Second convolutional layer
-                      out_channels=16,
-                      kernel_size=3, 
-                      stride=2,
-                      padding=1),
+            nn.Conv2d(in_channels  = nf,      # Second convolutional layer
+                      out_channels = 2*nf,
+                      kernel_size  = 3, 
+                      stride       = 2,
+                      padding      = 1),
             nn.ReLU(True),
-            nn.Conv2d(in_channels=16,     # Third convolutional layer
-                      out_channels=32,
-                      kernel_size=3, 
-                      stride=2,
-                      padding=0),
+            nn.Conv2d(in_channels  = 2*nf,     # Third convolutional layer
+                      out_channels = 4*nf,
+                      kernel_size  = 3, 
+                      stride       = 2,
+                      padding      = 0),
             nn.ReLU(True),
             nn.Flatten(start_dim=1)            # Flatten layer
                                   )
         
-        ### Now we implement the variational part
-        self.fc_mn = nn.Sequential(nn.Linear(in_features= (32 * 3* 3),out_features=64),                             
+        ### Now we implement the variational part, a layer for the mean and a layer for the standard deviation
+        self.fc_mn = nn.Sequential(nn.Linear(in_features= ((4*nf) * 3* 3),out_features=64),                             
                                    nn.ReLU(True),          
                                    nn.Linear(in_features=64, out_features=encoded_space_dim)
                                   )
         
-        self.fc_std = nn.Sequential(nn.Linear(in_features= (32 * 3* 3),out_features=64),                             
+        self.fc_std = nn.Sequential(nn.Linear(in_features= ((4*nf) * 3* 3),out_features=64),                             
                                    nn.ReLU(True),          
                                    nn.Linear(in_features=64, out_features=encoded_space_dim)
                                   )
@@ -369,29 +371,29 @@ class Variational_Autoencoder(nn.Module):
         self.decoder = nn.Sequential(
             nn.Linear(in_features=encoded_space_dim, out_features=64), # First linear layer
             nn.ReLU(True),
-            nn.Linear(in_features=64, out_features=(32*3*3)),          # Second linear layer
+            nn.Linear(in_features=64, out_features=((4*nf)*3*3)),          # Second linear layer
             nn.ReLU(True),
-            nn.Unflatten(dim=1, unflattened_size=(32, 3, 3)),           #Unflaten
-            nn.ConvTranspose2d(in_channels=32,                         # First transposed convolution
-                               out_channels=16,
-                               kernel_size=3, 
-                               stride=2,
-                               padding =0,
-                               output_padding=0),
+            nn.Unflatten(dim=1, unflattened_size=((4*nf), 3, 3)),           #Unflaten
+            nn.ConvTranspose2d(in_channels    = 4 * nf,                         # First transposed convolution
+                               out_channels   = 2 * nf,
+                               kernel_size    = 3, 
+                               stride         = 2,
+                               padding        = 0,
+                               output_padding = 0),
             nn.ReLU(True),
-            nn.ConvTranspose2d(in_channels=16,                         # Second transposed convolution
-                               out_channels=8,
-                               kernel_size=3, 
-                               stride=2,
-                               padding=1,
-                               output_padding=1),
+            nn.ConvTranspose2d(in_channels    = 2*nf,                         # Second transposed convolution
+                               out_channels   = nf,
+                               kernel_size    = 3, 
+                               stride         = 2,
+                               padding        = 1,
+                               output_padding = 1),
             nn.ReLU(True),
-            nn.ConvTranspose2d(in_channels=8,                          # Third transposed convolution
-                               out_channels=1,
-                               kernel_size=3, 
-                               stride=2,
-                               padding=1,
-                               output_padding=1)
+            nn.ConvTranspose2d(in_channels    = nf,                          # Third transposed convolution
+                               out_channels   = 1,
+                               kernel_size    = 3, 
+                               stride         = 2,
+                               padding        = 1,
+                               output_padding = 1)
                                 )
         
     def forward(self, x,mode):
@@ -422,28 +424,19 @@ class Variational_Autoencoder(nn.Module):
         
         
         
-        # Encode
-        z = self.encoder(x) 
-        # Predict distribution mean and standard deviation
-        mn  = self.fc_mn(z)
-        std = self.fc_std(z)
-        #sample distribution based on mean and standard deviation
-        sample = mn + torch.exp(std/2)*torch.rand_like(mn)
-        #decode
-        #out = self.decoder(sample)
-        return out, mn, std
     
-    def loss_VAE(self,prediction, real,mu,sigma):
+    def loss_VAE(self,prediction, real,mu,sigma,beta):
         loss = F.mse_loss(prediction, real, reduction='sum') 
         kl_div    = -0.5 * torch.sum(1. + sigma - mu**2 - torch.exp(sigma))
-        return loss, kl_div
+        return loss + beta * kl_div
+        #return loss, kl_div
     
     def sampler(self,mu,sigma):
         return mu + torch.exp(sigma/2)*torch.rand_like(mu)
         
     
     ### Training function
-    def train_epoch(self,device,dataloader, optimizer,verbose =True):
+    def train_epoch(self,device,dataloader, optimizer,beta,verbose =True):
         """
         This function train the network for one epoch
         """
@@ -455,7 +448,7 @@ class Variational_Autoencoder(nn.Module):
             #Process the data
             decoded_sample,mn,std = self.forward(sample_batched, "Train")
             # Compute loss
-            loss, kl_div = self.loss_VAE(decoded_sample, sample_batched,mn,std)
+            loss = self.loss_VAE(decoded_sample, sample_batched,mn,std,beta)
             # Backpropagation
             optimizer.zero_grad()
             loss.backward()
@@ -471,7 +464,7 @@ class Variational_Autoencoder(nn.Module):
         return train_loss
 
     ### Testing function
-    def test_epoch(self, device, dataloader, verbose = True):
+    def test_epoch(self, device, dataloader,beta, verbose = True):
         """
         This function test the network performance for one epoch of training
         """
@@ -484,7 +477,7 @@ class Variational_Autoencoder(nn.Module):
                 #Process the data
                 decoded_sample,mn,std = self.forward(sample_batched, "Test")
                 # Compute loss
-                loss, kl_div = self.loss_VAE(decoded_sample, sample_batched,mn,std)
+                loss = self.loss_VAE(decoded_sample, sample_batched,mn,std,beta)
                 #Save test loss for this batch
                 loss_batch = loss.detach().cpu().numpy()
                 test_loss.append(loss_batch)
@@ -496,7 +489,7 @@ class Variational_Autoencoder(nn.Module):
     
     
     
-    def training_cycle(self,device,training_data, test_data, optim,num_epochs,test_dataset, verbose = True):
+    def training_cycle(self,device,training_data, test_data, optim,num_epochs,test_dataset,beta, verbose = True):
         """
         This function train the network for a desired number of epochs it also test the network 
         reconstruction performance and make plots comparing the input image and the reconstructed one every 5 epochs.
@@ -511,12 +504,14 @@ class Variational_Autoencoder(nn.Module):
                 device=device, 
                 dataloader=training_data, 
                 optimizer=optim,
+                beta = beta,
                 verbose = verbose)
             train_loss.append(tr_l)
             ### Validation  (use the testing function)
             t_l = self.test_epoch(
                 device=device, 
                 dataloader=test_data,
+                beta = beta,
                 verbose = verbose)
             test_loss.append(t_l)
             #torch.save(encoder.state_dict(), 'encoder_params.pth')
