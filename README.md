@@ -20,7 +20,7 @@ In this work I implemented simple neural network models for solving two classica
 In this work I explored different unsupervised learning techniques based on deep learning. First a convolutional autoencoder was trained and tested on the fashion MNIST dataset, its learning parameters were optimized using OPTUNA. Then the best convolutional autoencoder was used in the context of transfer learning to perform a supervised classification task. Finally a variational convolutional autoencoder and a Generative Adversarial Network were trained and tested with the purpose of generating new samples.
 
 <p float="left">
-  <img src="https://github.com/hcapettini2/NNDL/blob/main/Homework_3_Reinforcement_Learning/Images/Pole_Gifs/Trained_Pole_0.gif" width="500" />
+  <img src="https://github.com/hcapettini2/NNDL/blob/main/Homework_2_Unsupervised_Learning/Img/GAN.gif" width="500" />
 </p>
 
 
