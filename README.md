@@ -13,7 +13,7 @@ code was implemented using PyTorch.
 In this work I implemented simple neural network models for solving two classical supervised learning tasks. The approximation of a function using a regression model and the classification of images from the Fashion MNIST dataset. For both tasks I explored the usage of different optimizers and regularization methods. The hyperparameters were optimised using a gridsearch for the regression and a Bayesian optimisation using Optuna for the classification task.
 <p float="left">
   <img src="https://github.com/hcapettini2/NNDL/blob/main/Homework_1_Supervised_Learning/imgs/regression/fit.svg" type="image/svg+xml" width="500" />
-  <img src="https://github.com/hcapettini2/NNDL/blob/main/Homework_1_Supervised_Learning/imgs/classification/missclasified.svg" type="image/svg+xml" width="500" />
+  <img src="https://github.com/hcapettini2/NNDL/blob/main/Homework_1_Supervised_Learning/imgs/classification/scl_activations.svg" type="image/svg+xml" width="500" />
 </p>
 
 ## Homework 2: Unsupervised Learning (Autoencoder, Variational Autoencoder, Generative Adversarial Network)
